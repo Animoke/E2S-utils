@@ -1,26 +1,22 @@
-import os, sys
-import json
+import os, sys, argparse, datetime
 import ffmpeg
 import glob
-import shutil
-import datetime
+import shutil, re
 from ffprobe import FFProbe
 
+# Modify path here
+user_path = "C:\\Users\\Path\\To\\E2S_SD\\Sample"
+
 cur_time = datetime.datetime.now()
-user_path = "C:\\Users\\Lambda23\\Documents\\programming\\python\\E2S-utils"
 all_files = user_path + "\\**\\*.*"
-backup_path = os.path.abspath(os.path.join(user_path, os.pardir)) + "\\Backup-E2S-utils" + cur_time.strftime('%Y-%m-%d_%H-%M-%S')
-
-#if not os.path.isdir(save_path):
-#    print("save_path not found. Making directory...")
-#    os.makedirs(save_path)
-
-#shutil.copytree(user_path, backup_path)
+backup_path = os.path.abspath(os.path.join(user_path, os.pardir)) + "\\Backup-E2S-utils_" + cur_time.strftime('%Y-%m-%d_%H-%M-%S')
 
 def stereo_to_mono():
+    i = 0
+    print("[CONVERT_MONO] Conversion merges both stereo tracks into one.")
     for filename in glob.iglob(all_files, recursive=True):
         if (filename.endswith(".wav")):
-            print(filename)
+            print("[CONVERT_MONO] " + filename)
             media = FFProbe(filename)
             for stream in media.streams:
                 if stream.is_audio():
@@ -34,47 +30,65 @@ def stereo_to_mono():
                             .run(capture_stdout=True, capture_stderr=True) #Quiet mode
                         )
                         shutil.move(out_filename, filename)
+                        i = i + 1
                     else:
-                        print("Number of channels do not match. \'" + stream.__dict__["channels"] + "\' is not 2. File is probably mono. Skipping...")
+                        print("[INFO] Number of channels do not match. \'" + stream.__dict__["channels"] + "\' is not 2. File is probably mono. Skipping...")
                         continue              
         else:
             continue
+    print("[CONVERT_MONO]", i, "files converted")
 
-def speed_doubler():
-    print("Speeding up samples...")
+def speed_convert(speed):
+    i = 0
+    print("[INFO][SPEED] File speed set to", speed)
     for filename in glob.iglob(all_files, recursive=True):
         if (filename.endswith(".wav")):
-            print(filename)
-            out_filename = filename + "2x-speed-e2s.wav"
+            media = FFProbe(filename)
+            media_probe = str(media.__dict__)
+            sample_rate_d = re.search(r"\d{5,6}Hz", media_probe)
+            sample_rate = int(re.sub(r"\D", "", sample_rate_d.group()))
+            print("[SPEED] " + filename + " | Speed:", speed, "| Sample Rate:", sample_rate, "Hz")
+            out_filename = filename + "-speed-e2s.wav"
             (
                 ffmpeg
                 .input(filename)
-                .filter('atempo', 2)
-                .output(out_filename) #os.system(f'ffmpeg -i {filename} -ac 1 {out_filename}')
+                .filter('asetrate', sample_rate * speed)
+                .output(out_filename, ar='44100')
                 .overwrite_output()
                 .run(capture_stdout=True, capture_stderr=True) #Quiet mode
             )
             shutil.move(out_filename, filename)
+            i = i + 1
         else:
             continue
+    print("[SPEED]", i, "files converted")
 
 def main():
-    if sys.argv[1] == "--convert-mono" or sys.argv[1] == "-m":
-        stereo_to_mono()
-    elif sys.argv[1] == "--speed" or sys.argv[1] == "-s":
-        speed_doubler()
-    elif sys.argv[1] == "--all" or sys.argv[1] == "-a" or len(sys.argv) <= 1:
-        stereo_to_mono()
-        speed_doubler()
-    else:
-        print("Input error")
+    parser = argparse.ArgumentParser(description="Convert all files in sub-directories to mono, with adjustable speed. Made for Korg machines")
+    parser.add_argument("-m", "--convert-mono", help="Convert to mono", action='store_true')
+    parser.add_argument("-s", "--speed", help="Speed selection (0.5-2.0)", action='store', type=float, default=2)
+    parser.add_argument("-a", "--all", help="Do everything (default speed: 2) [DEFAULT]", action='store_true')
+    args = parser.parse_args()
 
-    #shutil.copytree(user_path, backup_path)
+    print("[E2S-Utils] Backing up...")
+    try:
+        shutil.copytree(user_path, backup_path)
+    except shutil.Error as e:
+        print("Something went wrong.")
+        print(e.stderr, file=sys.stderr)
+        sys.exit(1)
+    print("[E2S-Utils] Backup successful. You can find it here: " + backup_path)
 
-    #cur_time = datetime.datetime.now()
-    #user_path = "C:\\Users\\Lambda23\\Documents\\programming\\python\\E2S-utils"
-    #all_files = user_path + "\\**\\*.*"
-    #backup_path = os.path.abspath(os.path.join(user_path, os.pardir)) + "\\Backup-E2S-utils" + cur_time.strftime('%Y-%m-%d_%H-%M-%S')
+    if args.all or len(sys.argv) <= 1:
+        stereo_to_mono()
+        speed_convert(2.0)
+        print("All tasks done.")
+    elif args.convert_mono:
+        stereo_to_mono()
+        print("All tasks done.")
+    elif args.speed:
+        speed_convert(args.speed)
+        print("All tasks done.")
 
 if __name__ == '__main__':
     main()
