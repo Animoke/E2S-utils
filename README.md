@@ -9,15 +9,21 @@ NOTE: This script only supports windows operating systems.
 
 # Usage
 
-Install required modules:\
-`pip install -r requirements.txt`
+Install required modules:
+```
+pip install -r requirements.txt
+```
 
 Put the path of the root directory of your library in line 8 (this will be added in arguments):\
 `user_path = "C:\\Users\\Path\\To\\E2S_SD\\Sample"`\
 NOTE: Sanitizing is not yet added so double all `\`.
 
-Execute the script with desired arguments:\
-e.g: `PS C:\..\E2S-utils> python.exe .\e2s-utils.py --convert-mono`\
+Execute the script with desired arguments:
+
+e.g: 
+```
+python.exe .\e2s-utils.py --convert-mono
+```
 \
 **Arguments list:**
 
