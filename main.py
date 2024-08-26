@@ -64,7 +64,7 @@ def speed_convert(speed):
     print("[SPEED]", i, "files converted")
 
 def main():
-    parser = argparse.ArgumentParser(description="Convert all files in sub-directories to mono, with adjustable speed. Made for Korg machines")
+    parser = argparse.ArgumentParser(description="Convert all files recursively in directories to mono, with adjustable speed. Made for Korg machines")
     parser.add_argument("-m", "--convert-mono", help="Convert to mono", action='store_true')
     parser.add_argument("-s", "--speed", help="Speed selection (0.5-2.0)", action='store', type=float, default=2)
     parser.add_argument("-a", "--all", help="Do everything (default speed: 2) [DEFAULT]", action='store_true')
