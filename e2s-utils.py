@@ -72,8 +72,8 @@ def delete_backup(user_path):
 
     print("/!\\ BE CAREFUL AND VERIFY YOUR FILES BEFORE PROCEEDING /!\\\nALL DIRECTORIES STARTING WITH \'Backup-E2S-utils_\' IN THE DIRECTORY ABOVE SPECIFIED PATH WILL BE DELETED\n")
     
-    delete_confirm = input("Type \'i know what i am doing\' to proceed... ")
-    if (delete_confirm != "i know what i am doing"):
+    delete_confirm = input("Type \'i am sure\' to proceed... ")
+    if (delete_confirm != "i am sure"):
         print("Cancelling...")
         return
     else:
