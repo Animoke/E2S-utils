@@ -14,31 +14,31 @@ Install required modules:
 pip install -r requirements.txt
 ```
 
-Put the path of the root directory of your library in line 8 (this will be added in arguments):\
-`user_path = "C:\\Users\\Path\\To\\E2S_SD\\Sample"`\
-NOTE: Sanitizing is not yet added so double all `\`.
-
 Execute the script with desired arguments:
 
 e.g: 
 ```
-python.exe .\e2s-utils.py --convert-mono
+python.exe .\e2s-utils.py --convert-mono C:/Users/Animoke/Music/E2S
 ```
 \
 **Arguments list:**
 
 
 ```
-usage: main.py [-h] [-m] [-s SPEED] [-a]
+usage: e2s-utils.py [-h] [-m] [-s SPEED] [--delete-backups] PATH
 
 Convert all files recursively in directories to mono, with adjustable speed. Made for Korg machines
+
+positional arguments:
+  PATH                  Path to process (default speed: 2)
 
 options:
   -h, --help            show this help message and exit
   -m, --convert-mono    Convert to mono
   -s SPEED, --speed SPEED
                         Speed selection (0.5-2.0)
-  -a, --all             Do everything (default speed: 2) [DEFAULT]
+  --delete-backups      Delete the backups for specified library directory (should be the same path)
 ```
 \
 This software may not be 100% reliable. I am not responsible for any data losses, take your precautions!
+Korg is not affiliated with this project, and the name KORG is used solely for decriptive purposes.
