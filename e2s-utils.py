@@ -1,7 +1,7 @@
 import os, sys, argparse, datetime, errno, stat
 import ffmpeg
 import glob
-import shutil, re
+import shutil, re, itertools
 from ffprobe import FFProbe
 from argparse import ArgumentParser
 from pathvalidate.argparse import validate_filename_arg, validate_filepath_arg
@@ -45,7 +45,7 @@ def stereo_to_mono(all_files):
 
 def speed_convert(all_files, speed):
     i = 0
-    print("[INFO][SPEED] File speed set to", speed)
+    print("[INFO][SPEED] File speed is set to", speed)
     for filename in glob.iglob(all_files, recursive=True):
         if (filename.endswith(".wav")):
             media = FFProbe(filename)
@@ -67,6 +67,38 @@ def speed_convert(all_files, speed):
         else:
             continue
     print("[SPEED]", i, "files converted")
+
+def name_pattern(all_files, create_subdir):
+
+    def replace(string, pattern):
+        string.replace(pattern, '')
+        print(string)
+
+    def compare(a, b): # TODO: make it work
+        dest = ""
+        for i in range(len(a)):
+            for j in range(len(b)):
+                if a[i] == b[j]:
+                    dst = dest.join(a)
+        return dst
+
+    print("[NAME_PATTERN] CREATE_SUBDIR is set to", create_subdir)
+
+    names = []
+
+    for filename in glob.iglob(all_files, recursive=True):
+        if (filename.endswith(".wav")):
+            names.append(filename)
+        else:
+            continue
+    
+    for a,b in itertools.combinations(names, 2):
+        res = compare(a, b)
+        print(res)
+
+
+    names.sort()
+    #print(names)
 
 def delete_backup(user_path):
 
@@ -93,6 +125,7 @@ def main():
     parser = argparse.ArgumentParser(description="Convert all files recursively in directories to mono, with adjustable speed. Made for Korg machines")
     parser.add_argument("-m", "--convert-mono", help="Convert to mono", action='store_true')
     parser.add_argument("-s", "--speed", help="Speed selection (0.5-2.0)", action='store', type=float)
+    parser.add_argument("-np", "--name-pattern", help="Find name patterns, delete them and move to subdirectoy", action='store', type=bool, metavar='CREATE_SUBDIR')
     parser.add_argument("--delete-backups", help="Delete the backups for specified library directory (should be the same path)", action='store_true')
     parser.add_argument("path_to_convert", metavar="PATH", help="Path to process (default speed: 2)", type=validate_filepath_arg)
     args = parser.parse_args()
@@ -123,6 +156,8 @@ def main():
     if args.speed:
         speed_convert(all_files, args.speed)
         print("All tasks done.")
+    if args.name_pattern:
+        name_pattern(all_files, args.name_pattern)
 
 if __name__ == '__main__':
     main()
