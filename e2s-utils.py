@@ -1,5 +1,5 @@
 import os, sys, argparse, datetime, errno, stat
-import ffmpeg
+import ffmpeg, taglib
 import glob
 import shutil, re, itertools
 from ffprobe import FFProbe
@@ -43,6 +43,34 @@ def stereo_to_mono(all_files):
             continue
     print("[CONVERT_MONO]", i, "files converted")
 
+def read_speed_metadata(filename):
+    metadata = taglib.File(filename)
+    original_comments = str(metadata.tags['COMMENT'])
+    original_speed_r = re.match(r".+\, \[E2S-UTILS\] SPEED: (\d+.\d+)", original_comments)
+
+    if original_speed_r != None:
+        original_speed = float(original_speed_r.group(1))
+        return original_speed
+
+def write_speed_metadata(filename, speed):
+    metadata = taglib.File(filename)
+    original_comments = str(metadata.tags['COMMENT'])
+    original_speed_r = re.match(r".+\, \[E2S-UTILS\] SPEED: (\d+.\d+)", original_comments)
+    original_comments = re.sub(r"\[\'", "", original_comments)
+    original_comments = re.sub(r"\'\]", "", original_comments)
+    original_comments = re.sub(r", \[E2S-UTILS\] SPEED: \d+.\d+", "", original_comments)
+
+    if original_speed_r != None:
+        original_speed = float(original_speed_r.group(1))
+        new_speed = speed * original_speed
+        print('og s', original_speed, 'usr s', speed, 'new s', new_speed)
+        speed = new_speed
+    metadata.tags['COMMENT'] = [f'{original_comments}, [E2S-UTILS] SPEED: {speed}']
+    metadata.save()
+    print(metadata.tags)
+    metadata.close()
+    return speed
+
 def speed_convert(all_files, speed):
     i = 0
     print("[INFO][SPEED] File speed is set to", speed)
@@ -52,17 +80,20 @@ def speed_convert(all_files, speed):
             media_probe = str(media.__dict__)
             sample_rate_d = re.search(r"\d{5,6}Hz", media_probe)
             sample_rate = int(re.sub(r"\D", "", sample_rate_d.group()))
-            print("[SPEED] " + filename + " | Speed mod:", speed, "| Original sample Rate:", sample_rate, "Hz")
-            out_filename = filename + "-speed-e2s.wav"
+            or_speed = read_speed_metadata(filename)
+            new_speed = write_speed_metadata(filename, speed)
+            print("[SPEED] " + filename + " | Original speed:", or_speed, " | Speed mod:", speed, "| New speed", new_speed, "| Original sample rate:", sample_rate, "Hz")
+            in_filename = filename + "-speed-e2s.wav"
+            shutil.move(filename, in_filename)
             (
                 ffmpeg
-                .input(filename)
+                .input(in_filename)
                 .filter('asetrate', sample_rate * speed)
-                .output(out_filename, ar='44100')
+                .output(filename, ar='44100')
                 .overwrite_output()
                 .run(capture_stdout=True, capture_stderr=True) #Quiet mode
             )
-            shutil.move(out_filename, filename)
+            os.remove(in_filename)
             i = i + 1
         else:
             continue
@@ -74,14 +105,6 @@ def name_pattern(all_files, create_subdir):
         string.replace(pattern, '')
         print(string)
 
-    def compare(a, b): # TODO: make it work
-        dest = ""
-        for i in range(len(a)):
-            for j in range(len(b)):
-                if a[i] == b[j]:
-                    dst = dest.join(a)
-        return dst
-
     print("[NAME_PATTERN] CREATE_SUBDIR is set to", create_subdir)
 
     names = []
@@ -89,16 +112,12 @@ def name_pattern(all_files, create_subdir):
     for filename in glob.iglob(all_files, recursive=True):
         if (filename.endswith(".wav")):
             names.append(filename)
+            audio = taglib.File(filename)
+            print(audio.tags)
         else:
             continue
-    
-    for a,b in itertools.combinations(names, 2):
-        res = compare(a, b)
-        print(res)
 
-
-    names.sort()
-    #print(names)
+    print(names)
 
 def delete_backup(user_path):
 
@@ -125,7 +144,7 @@ def main():
     parser = argparse.ArgumentParser(description="Convert all files recursively in directories to mono, with adjustable speed. Made for Korg machines")
     parser.add_argument("-m", "--convert-mono", help="Convert to mono", action='store_true')
     parser.add_argument("-s", "--speed", help="Speed selection (0.5-2.0)", action='store', type=float)
-    parser.add_argument("-np", "--name-pattern", help="Find name patterns, delete them and move to subdirectoy", action='store', type=bool, metavar='CREATE_SUBDIR')
+    parser.add_argument("-cs", "--create-subdir", help="Wether to create a subdirectory with the recognized pattern (1: True, 0: False)", action='store', type=int)
     parser.add_argument("--delete-backups", help="Delete the backups for specified library directory (should be the same path)", action='store_true')
     parser.add_argument("path_to_convert", metavar="PATH", help="Path to process (default speed: 2)", type=validate_filepath_arg)
     args = parser.parse_args()
@@ -136,15 +155,15 @@ def main():
 
     if args.delete_backups:
         delete_backup(user_path)
-    if args.convert_mono or args.speed or len(sys.argv) == 2:
-        print("[E2S-Utils] Backing up...")
-        try:
-            shutil.copytree(user_path, backup_path)
-        except shutil.Error as e:
-            print("Something went wrong.")
-            print(e.stderr, file=sys.stderr)
-            sys.exit(1)
-        print("[E2S-Utils] Backup successful. You can find it here: " + backup_path)
+    #if args.convert_mono or args.speed or len(sys.argv) == 2:
+    #    print("[E2S-Utils] Backing up...")
+    #    try:
+    #        shutil.copytree(user_path, backup_path)
+    #    except shutil.Error as e:
+    #        print("Something went wrong.")
+    #        print(e.stderr, file=sys.stderr)
+    #        sys.exit(1)
+    #    print("[E2S-Utils] Backup successful. You can find it here: " + backup_path)
 
     if args.path_to_convert and len(sys.argv) == 2:
         stereo_to_mono(all_files)
@@ -156,8 +175,6 @@ def main():
     if args.speed:
         speed_convert(all_files, args.speed)
         print("All tasks done.")
-    if args.name_pattern:
-        name_pattern(all_files, args.name_pattern)
 
 if __name__ == '__main__':
     main()
