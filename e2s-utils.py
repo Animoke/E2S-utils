@@ -63,11 +63,10 @@ def write_speed_metadata(filename, speed):
     if original_speed_r != None:
         original_speed = float(original_speed_r.group(1))
         new_speed = speed * original_speed
-        print('og s', original_speed, 'usr s', speed, 'new s', new_speed)
         speed = new_speed
     metadata.tags['COMMENT'] = [f'{original_comments}, [E2S-UTILS] SPEED: {speed}']
     metadata.save()
-    print(metadata.tags)
+    #print(metadata.tags)
     metadata.close()
     return speed
 
@@ -99,26 +98,6 @@ def speed_convert(all_files, speed):
             continue
     print("[SPEED]", i, "files converted")
 
-def name_pattern(all_files, create_subdir):
-
-    def replace(string, pattern):
-        string.replace(pattern, '')
-        print(string)
-
-    print("[NAME_PATTERN] CREATE_SUBDIR is set to", create_subdir)
-
-    names = []
-
-    for filename in glob.iglob(all_files, recursive=True):
-        if (filename.endswith(".wav")):
-            names.append(filename)
-            audio = taglib.File(filename)
-            print(audio.tags)
-        else:
-            continue
-
-    print(names)
-
 def delete_backup(user_path):
 
     print("/!\\ BE CAREFUL AND VERIFY YOUR FILES BEFORE PROCEEDING /!\\\nALL DIRECTORIES STARTING WITH \'Backup-E2S-utils_\' IN THE DIRECTORY ABOVE SPECIFIED PATH WILL BE DELETED\n")
@@ -144,7 +123,6 @@ def main():
     parser = argparse.ArgumentParser(description="Convert all files recursively in directories to mono, with adjustable speed. Made for Korg machines")
     parser.add_argument("-m", "--convert-mono", help="Convert to mono", action='store_true')
     parser.add_argument("-s", "--speed", help="Speed selection (0.5-2.0)", action='store', type=float)
-    parser.add_argument("-cs", "--create-subdir", help="Wether to create a subdirectory with the recognized pattern (1: True, 0: False)", action='store', type=int)
     parser.add_argument("--delete-backups", help="Delete the backups for specified library directory (should be the same path)", action='store_true')
     parser.add_argument("path_to_convert", metavar="PATH", help="Path to process (default speed: 2)", type=validate_filepath_arg)
     args = parser.parse_args()
@@ -155,15 +133,15 @@ def main():
 
     if args.delete_backups:
         delete_backup(user_path)
-    #if args.convert_mono or args.speed or len(sys.argv) == 2:
-    #    print("[E2S-Utils] Backing up...")
-    #    try:
-    #        shutil.copytree(user_path, backup_path)
-    #    except shutil.Error as e:
-    #        print("Something went wrong.")
-    #        print(e.stderr, file=sys.stderr)
-    #        sys.exit(1)
-    #    print("[E2S-Utils] Backup successful. You can find it here: " + backup_path)
+    if args.convert_mono or args.speed or len(sys.argv) == 2:
+        print("[E2S-Utils] Backing up...")
+        try:
+            shutil.copytree(user_path, backup_path)
+        except shutil.Error as e:
+            print("Something went wrong.")
+            print(e.stderr, file=sys.stderr)
+            sys.exit(1)
+        print("[E2S-Utils] Backup successful. You can find it here: " + backup_path)
 
     if args.path_to_convert and len(sys.argv) == 2:
         stereo_to_mono(all_files)
