@@ -1,7 +1,7 @@
 import os, sys, argparse, datetime, errno, stat
-import ffmpeg
+import ffmpeg, taglib
 import glob
-import shutil, re
+import shutil, re, itertools
 from ffprobe import FFProbe
 from argparse import ArgumentParser
 from pathvalidate.argparse import validate_filename_arg, validate_filepath_arg
@@ -18,10 +18,14 @@ def handleRemoveReadonly(func, path, exc):
 
 def stereo_to_mono(all_files):
     i = 0
+    fcount = 0
     print("[CONVERT_MONO] Conversion merges both stereo tracks into one.")
+    filetree = glob.glob(all_files, recursive=True)
+    filetree_len = len(filetree)
     for filename in glob.iglob(all_files, recursive=True):
         if (filename.endswith(".wav")):
-            print("[CONVERT_MONO] " + filename)
+            fcount += 1
+            print(f"[{fcount}/{filetree_len}] " + filename)
             media = FFProbe(filename)
             for stream in media.streams:
                 if stream.is_audio():
@@ -43,27 +47,61 @@ def stereo_to_mono(all_files):
             continue
     print("[CONVERT_MONO]", i, "files converted")
 
+def read_speed_metadata(filename):
+    metadata = taglib.File(filename)
+    original_comments = str(metadata.tags['COMMENT'])
+    original_speed_r = re.match(r".+\, \[E2S-UTILS\] SPEED: (\d+.\d+)", original_comments)
+
+    if original_speed_r != None:
+        original_speed = float(original_speed_r.group(1))
+        return original_speed
+
+def write_speed_metadata(filename, speed):
+    metadata = taglib.File(filename)
+    original_comments = str(metadata.tags['COMMENT'])
+    original_speed_r = re.match(r".+\, \[E2S-UTILS\] SPEED: (\d+.\d+)", original_comments)
+    original_comments = re.sub(r"\[\'", "", original_comments)
+    original_comments = re.sub(r"\'\]", "", original_comments)
+    original_comments = re.sub(r", \[E2S-UTILS\] SPEED: \d+.\d+", "", original_comments)
+
+    if original_speed_r != None:
+        original_speed = float(original_speed_r.group(1))
+        new_speed = speed * original_speed
+        speed = new_speed
+    metadata.tags['COMMENT'] = [f'{original_comments}, [E2S-UTILS] SPEED: {speed}']
+    metadata.save()
+    #print(metadata.tags)
+    metadata.close()
+    return speed
+
 def speed_convert(all_files, speed):
     i = 0
-    print("[INFO][SPEED] File speed set to", speed)
+    fcount = 0
+    print("[INFO][SPEED] File speed is set to", speed)
+    filetree = glob.glob(all_files, recursive=True)
+    filetree_len = len(filetree)
     for filename in glob.iglob(all_files, recursive=True):
         if (filename.endswith(".wav")):
             media = FFProbe(filename)
             media_probe = str(media.__dict__)
             sample_rate_d = re.search(r"\d{5,6}Hz", media_probe)
             sample_rate = int(re.sub(r"\D", "", sample_rate_d.group()))
-            print("[SPEED] " + filename + " | Speed mod:", speed, "| Original sample Rate:", sample_rate, "Hz")
-            out_filename = filename + "-speed-e2s.wav"
+            or_speed = read_speed_metadata(filename)
+            new_speed = write_speed_metadata(filename, speed)
+            fcount += 1
+            print(f"[{fcount}/{filetree_len}] " + filename + " | Original speed:", or_speed, " | Speed mod:", speed, "| New speed", new_speed, "| Original sample rate:", sample_rate, "Hz")
+            in_filename = filename + "-speed-e2s.wav"
+            shutil.move(filename, in_filename)
             (
                 ffmpeg
-                .input(filename)
+                .input(in_filename)
                 .filter('asetrate', sample_rate * speed)
-                .output(out_filename, ar='44100')
+                .output(filename, ar='44100')
                 .overwrite_output()
                 .run(capture_stdout=True, capture_stderr=True) #Quiet mode
             )
-            shutil.move(out_filename, filename)
             i = i + 1
+            os.remove(in_filename)
         else:
             continue
     print("[SPEED]", i, "files converted")
@@ -98,7 +136,7 @@ def main():
     args = parser.parse_args()
     
     user_path = args.path_to_convert
-    all_files = user_path + "\\**\\*.*"
+    all_files = user_path + "\\**\\*.wav"
     backup_path = os.path.abspath(os.path.join(user_path, os.pardir)) + "\\Backup-E2S-utils_" + cur_time.strftime('%Y-%m-%d_%H-%M-%S')
 
     if args.delete_backups:
