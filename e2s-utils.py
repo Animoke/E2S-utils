@@ -18,10 +18,14 @@ def handleRemoveReadonly(func, path, exc):
 
 def stereo_to_mono(all_files):
     i = 0
+    fcount = 0
     print("[CONVERT_MONO] Conversion merges both stereo tracks into one.")
+    filetree = glob.glob(all_files, recursive=True)
+    filetree_len = len(filetree)
     for filename in glob.iglob(all_files, recursive=True):
         if (filename.endswith(".wav")):
-            print("[CONVERT_MONO] " + filename)
+            fcount += 1
+            print(f"[{fcount}/{filetree_len}] " + filename)
             media = FFProbe(filename)
             for stream in media.streams:
                 if stream.is_audio():
@@ -72,7 +76,10 @@ def write_speed_metadata(filename, speed):
 
 def speed_convert(all_files, speed):
     i = 0
+    fcount = 0
     print("[INFO][SPEED] File speed is set to", speed)
+    filetree = glob.glob(all_files, recursive=True)
+    filetree_len = len(filetree)
     for filename in glob.iglob(all_files, recursive=True):
         if (filename.endswith(".wav")):
             media = FFProbe(filename)
@@ -81,7 +88,8 @@ def speed_convert(all_files, speed):
             sample_rate = int(re.sub(r"\D", "", sample_rate_d.group()))
             or_speed = read_speed_metadata(filename)
             new_speed = write_speed_metadata(filename, speed)
-            print("[SPEED] " + filename + " | Original speed:", or_speed, " | Speed mod:", speed, "| New speed", new_speed, "| Original sample rate:", sample_rate, "Hz")
+            fcount += 1
+            print(f"[{fcount}/{filetree_len}] " + filename + " | Original speed:", or_speed, " | Speed mod:", speed, "| New speed", new_speed, "| Original sample rate:", sample_rate, "Hz")
             in_filename = filename + "-speed-e2s.wav"
             shutil.move(filename, in_filename)
             (
@@ -92,8 +100,8 @@ def speed_convert(all_files, speed):
                 .overwrite_output()
                 .run(capture_stdout=True, capture_stderr=True) #Quiet mode
             )
-            os.remove(in_filename)
             i = i + 1
+            os.remove(in_filename)
         else:
             continue
     print("[SPEED]", i, "files converted")
@@ -128,7 +136,7 @@ def main():
     args = parser.parse_args()
     
     user_path = args.path_to_convert
-    all_files = user_path + "\\**\\*.*"
+    all_files = user_path + "\\**\\*.wav"
     backup_path = os.path.abspath(os.path.join(user_path, os.pardir)) + "\\Backup-E2S-utils_" + cur_time.strftime('%Y-%m-%d_%H-%M-%S')
 
     if args.delete_backups:
