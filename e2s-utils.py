@@ -25,7 +25,7 @@ def stereo_to_mono(all_files):
     for filename in glob.iglob(all_files, recursive=True):
         if (filename.endswith(".wav")):
             fcount += 1
-            print(f"[{fcount}/{filetree_len}] " + filename)
+            sys.stdout.write(f"\r[{fcount}/{filetree_len}] " + filename + " ")
             media = FFProbe(filename)
             for stream in media.streams:
                 if stream.is_audio():
@@ -41,7 +41,7 @@ def stereo_to_mono(all_files):
                         shutil.move(out_filename, filename)
                         i = i + 1
                     else:
-                        print("[INFO] Number of channels do not match. \'" + stream.__dict__["channels"] + "\' is not 2. File is probably mono. Skipping...")
+                        print("\n[INFO] Number of channels do not match. \'" + stream.__dict__["channels"] + "\' is not 2. File is probably mono. Skipping...")
                         continue              
         else:
             continue
@@ -49,25 +49,35 @@ def stereo_to_mono(all_files):
 
 def read_speed_metadata(filename):
     metadata = taglib.File(filename)
-    original_comments = str(metadata.tags['COMMENT'])
-    original_speed_r = re.match(r".+\, \[E2S-UTILS\] SPEED: (\d+.\d+)", original_comments)
+    check = metadata.tags.get('COMMENT', None)
+    if check != None:
+        original_comments = str(metadata.tags['COMMENT'])
+        original_speed_r = re.match(r".+\, \[E2S-UTILS\] SPEED: (\d+.\d+)", original_comments)
 
-    if original_speed_r != None:
-        original_speed = float(original_speed_r.group(1))
-        return original_speed
+        if original_speed_r != None:
+            original_speed = float(original_speed_r.group(1))
+            return original_speed
+    else:
+        return None
 
 def write_speed_metadata(filename, speed):
     metadata = taglib.File(filename)
-    original_comments = str(metadata.tags['COMMENT'])
-    original_speed_r = re.match(r".+\, \[E2S-UTILS\] SPEED: (\d+.\d+)", original_comments)
-    original_comments = re.sub(r"\[\'", "", original_comments)
-    original_comments = re.sub(r"\'\]", "", original_comments)
-    original_comments = re.sub(r", \[E2S-UTILS\] SPEED: \d+.\d+", "", original_comments)
+    check = metadata.tags.get('COMMENT', None)
+    original_comments = ''
+    if check != None:
+        original_comments = str(metadata.tags['COMMENT'])
+        original_speed_r = re.match(r".+\, \[E2S-UTILS\] SPEED: (\d+.\d+)", original_comments)
+        original_comments = re.sub(r"\[\'", "", original_comments)
+        original_comments = re.sub(r"\'\]", "", original_comments)
+        original_comments = re.sub(r", \[E2S-UTILS\] SPEED: \d+.\d+", "", original_comments)
 
-    if original_speed_r != None:
-        original_speed = float(original_speed_r.group(1))
-        new_speed = speed * original_speed
-        speed = new_speed
+        if original_speed_r != None:
+            original_speed = float(original_speed_r.group(1))
+    else:
+        original_speed = 1.0
+        
+    new_speed = speed * original_speed
+    speed = new_speed
     metadata.tags['COMMENT'] = [f'{original_comments}, [E2S-UTILS] SPEED: {speed}']
     metadata.save()
     #print(metadata.tags)
